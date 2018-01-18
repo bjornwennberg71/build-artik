@@ -1,0 +1,6 @@
+git clone https://github.com/SamsungARTIK/linux-artik.git -b A530_os_3.0.0
+git clone https://github.com/SamsungARTIK/u-boot-artik.git -b A530_os_3.0.0
+git clone https://github.com/SamsungARTIK/build-artik.git -b A530_os_3.0.0
+#git clone https://github.com/SamsungARTIK/boot-firmwares-artik5.git
+git clone https://github.com/SamsungARTIK/boot-firmwares-artik530.git -b A530_os_3.0.0
+

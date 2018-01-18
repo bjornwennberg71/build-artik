@@ -16,6 +16,9 @@ PREBUILT_REPO_OPT=
 DEPLOY=false
 OS_NAME=fedora
 
+#bw
+BUILD_VERSION="bjornw"
+
 print_usage()
 {
 	echo "-h/--help         Show help options"
@@ -191,6 +194,7 @@ mkdir -p $TARGET_DIR
 gen_artik_release
 
 if [ "$PREBUILT_VBOOT_DIR" == "" ]; then
+ # bw removed for now
 	./build_uboot.sh
 	./build_kernel.sh
 
@@ -212,9 +216,9 @@ if $SECURE_BOOT ; then
 	./mksboot.sh $TARGET_DIR
 fi
 
-./mksdboot.sh
+bash -xv ./mksdboot.sh -b $TARGET_BOARD
 
-./mkbootimg.sh
+bash -xv ./mkbootimg.sh
 
 if $FULL_BUILD ; then
 	if [ "$BASE_BOARD" != "" ]; then
@@ -295,3 +299,4 @@ ls -al $TARGET_DIR
 
 echo "ARTIK release information"
 cat $TARGET_DIR/artik_release
+
