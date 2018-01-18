@@ -9,3 +9,11 @@ sudo apt-get install android-tools-fsutils
 sudo apt-get install gcc-arm-linux-gnueabihf
 sudo apt-get install kpartx u-boot-tools gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu device-tree-compiler
 git clone https://github.com/SamsungARTIK/ubuntu-build-service.git -b A530_os_3.0.0
+
+
+#
+git clone https://github.com/SamsungARTIK/fed-artik-tools.git -b artik
+sudo apt-get install build-essential qemu-user-static createrepo libguestfs-tools git sudo
+debuild -us -uc
+sudo dpkg -i fed-artik-tools_1.2.15_amd64.deb
+fed-artik-host-init-buildsys ./boot-firmwares-artik530s/fedora-arm-artik530-rootfs-0530GC0F-44F-01Q5-20170710.170216-4c0d561a2c008d8ff08a6865fc505df8.tar.gz 

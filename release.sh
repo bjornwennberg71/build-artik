@@ -15,9 +15,10 @@ PREBUILT_VBOOT_DIR=
 PREBUILT_REPO_OPT=
 DEPLOY=false
 OS_NAME=fedora
+#OS_NAME=ubuntu
 
 #bw
-BUILD_VERSION="bjornw"
+BUILD_VERSION="ForgeRockOS"
 
 print_usage()
 {
@@ -132,6 +133,7 @@ package_check()
 gen_artik_release()
 {
 	upper_model=$(echo -n ${TARGET_BOARD} | awk '{print toupper($0)}')
+        echo "DEBUG: $TARGET_DIR"
 	if [ "$ARTIK_RELEASE_LEGACY" != "1" ]; then
 		cat > $TARGET_DIR/artik_release << __EOF__
 OFFICIAL_VERSION=${OFFICIAL_VERSION}

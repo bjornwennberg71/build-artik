@@ -5,5 +5,5 @@
 # Utility script for building and signing the 530
 
 
-./release.sh -c config/artik530s.cfg -m --full-build 
+bash -xv ./release.sh -c config/artik530s.cfg -m --full-build  
 
