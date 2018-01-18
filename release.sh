@@ -216,9 +216,9 @@ if $SECURE_BOOT ; then
 	./mksboot.sh $TARGET_DIR
 fi
 
-bash -xv ./mksdboot.sh -b $TARGET_BOARD
+./mksdboot.sh -b $TARGET_BOARD
 
-bash -xv ./mkbootimg.sh
+./mkbootimg.sh
 
 if $FULL_BUILD ; then
 	if [ "$BASE_BOARD" != "" ]; then

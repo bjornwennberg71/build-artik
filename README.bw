@@ -1,6 +1,11 @@
+# this repo:
+#git clone https://github.com/~bjornwennberg71/build-artik.git -b A530_os_3.0.0
 git clone https://github.com/SamsungARTIK/linux-artik.git -b A530_os_3.0.0
 git clone https://github.com/SamsungARTIK/u-boot-artik.git -b A530_os_3.0.0
-git clone https://github.com/SamsungARTIK/build-artik.git -b A530_os_3.0.0
-#git clone https://github.com/SamsungARTIK/boot-firmwares-artik5.git
 git clone https://github.com/SamsungARTIK/boot-firmwares-artik530.git -b A530_os_3.0.0
 
+sudo apt install kpartx
+sudo apt-get install android-tools-fsutils
+sudo apt-get install gcc-arm-linux-gnueabihf
+sudo apt-get install kpartx u-boot-tools gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu device-tree-compiler
+git clone https://github.com/SamsungARTIK/ubuntu-build-service.git -b A530_os_3.0.0
