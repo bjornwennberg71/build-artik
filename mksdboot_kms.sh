@@ -3,11 +3,15 @@
 set -e
 
 SDBOOT_IMAGE=false
+KMS_PREBUILT_DIR=
+KMS_TARGET_DIR=
 
 print_usage()
 {
 	echo "-h/--help         Show help options"
-	echo "-b [TARGET_BOARD]	Target board ex) -b artik710|artik530|artik5|artik10"
+	echo "-b [TARGET_BOARD] Target board ex) -b artik710|artik530|artik5|artik10"
+	echo "--kms-prebuilt-dir	Signed binaries directory"
+	echo "--kms-out-dir			Signed output directory"
 
 	exit 0
 }
@@ -23,6 +27,13 @@ parse_options()
 			-b)
 				TARGET_BOARD="$2"
 				shift ;;
+			--kms-prebuilt-dir)
+				KMS_PREBUILT_DIR=`readlink -e "$2"`
+				shift
+				shift ;;
+			--kms-target-dir)
+				KMS_TARGET_DIR=`readlink -e "$2"`
+				shift ;;
 		esac
 	done
 }
@@ -32,67 +43,34 @@ die() {
 	exit 1
 }
 
-gen_nexell_image_mon()
-{
-	local chip_name=$(echo -n ${CHIP_NAME} | awk '{print toupper($0)}')
-	if [ "$CHIP_NAME" == "s5p4418" ]; then
-		input_file=bl_mon.img
-
-		if [ "$RSA_SIGN_TOOL" != "" ]; then
-			chmod a+x ${RSA_SIGN_TOOL}
-			${RSA_SIGN_TOOL} -sign $TARGET_DIR/${input_file}
-		fi
-	fi
-}
-
-gen_nexell_image_secure()
-{
-	local chip_name=$(echo -n ${CHIP_NAME} | awk '{print toupper($0)}')
-	if [ "$CHIP_NAME" == "s5p6818" ]; then
-		input_file=fip-secure.img
-	else
-		input_file=secureos.img
-	fi
-
-	if [ "$RSA_SIGN_TOOL" != "" ]; then
-		chmod a+x ${RSA_SIGN_TOOL}
-		${RSA_SIGN_TOOL} -sign $TARGET_DIR/${input_file}
-	fi
-}
-
 s5p6818_sdboot_gen()
 {
-	cp $PREBUILT_DIR/bl1-*.img $TARGET_DIR
+	cp $KMS_PREBUILT_DIR/bl1-*.img $KMS_TARGET_DIR
 	cp $PREBUILT_DIR/fip-loader-*.img $TARGET_DIR
 	cp $PREBUILT_DIR/partmap_emmc.txt $TARGET_DIR
-	cp $PREBUILT_DIR/fip-secure.img $TARGET_DIR
-	if [ "$SECURE_BOOT" == "enable" ]; then
-		gen_nexell_image_secure
-	fi
+	cp $KMS_PREBUILT_DIR/fip-secure.img-signed $KMS_TARGET_DIR
+	cp $KMS_PREBUILT_DIR/${UBOOT_IMAGE}-signed $KMS_TARGET_DIR
 
 	if [ "$OTA" == "true" ]; then
 		cp $PREBUILT_DIR/partmap_emmc_ota.txt $TARGET_DIR/partmap_emmc.txt
 		cp $PREBUILT_DIR/flag.img $TARGET_DIR
 	fi
 
-	dd conv=notrunc if=$TARGET_DIR/bl1-sdboot.img of=$IMG_NAME bs=512 seek=$BL1_OFFSET
+	dd conv=notrunc if=$KMS_TARGET_DIR/bl1-sdboot.img of=$IMG_NAME bs=512 seek=$BL1_OFFSET
 	dd conv=notrunc if=$TARGET_DIR/fip-loader-sd.img of=$IMG_NAME bs=512 seek=$BL2_OFFSET
-	dd conv=notrunc if=$TARGET_DIR/fip-secure.img of=$IMG_NAME bs=512 seek=$TZSW_OFFSET
-	dd conv=notrunc if=$TARGET_DIR/$UBOOT_IMAGE of=$IMG_NAME bs=512 seek=$UBOOT_OFFSET
+	dd conv=notrunc if=$KMS_TARGET_DIR/fip-secure.img-signed of=$IMG_NAME bs=512 seek=$TZSW_OFFSET
+	dd conv=notrunc if=$KMS_TARGET_DIR/${UBOOT_IMAGE}-signed of=$IMG_NAME bs=512 seek=$UBOOT_OFFSET
 	dd conv=notrunc if=$TARGET_DIR/$PARAMS_NAME of=$IMG_NAME bs=512 seek=$ENV_OFFSET
 }
 
 s5p4418_sdboot_gen()
 {
 	cp $PREBUILT_DIR/bl1-*.img $TARGET_DIR
-	cp $PREBUILT_DIR/loader-*.img $TARGET_DIR
+	cp $KMS_PREBUILT_DIR/loader-*.img $KMS_TARGET_DIR
 	cp $PREBUILT_DIR/partmap_emmc.txt $TARGET_DIR
-	cp $PREBUILT_DIR/bl_mon.img $TARGET_DIR
-	cp $PREBUILT_DIR/secureos.img $TARGET_DIR
-	if [ "$SECURE_BOOT" == "enable" ]; then
-		gen_nexell_image_mon
-		gen_nexell_image_secure
-	fi
+	cp $KMS_PREBUILT_DIR/bl_mon.img-signed $KMS_TARGET_DIR
+	cp $KMS_PREBUILT_DIR/secureos.img-signed $KMS_TARGET_DIR
+	cp $KMS_PREBUILT_DIR/${UBOOT_IMAGE}-signed $KMS_TARGET_DIR
 
 	if [ "$OTA" == "true" ]; then
 		cp $PREBUILT_DIR/partmap_emmc_ota.txt $TARGET_DIR/partmap_emmc.txt
@@ -100,14 +78,14 @@ s5p4418_sdboot_gen()
 	fi
 
 	dd conv=notrunc if=$TARGET_DIR/bl1-sdboot.img of=$IMG_NAME bs=512 seek=$BL1_OFFSET
-	dd conv=notrunc if=$TARGET_DIR/loader-sd.img of=$IMG_NAME bs=512 seek=$LOADER_OFFSET
-	dd conv=notrunc if=$TARGET_DIR/bl_mon.img of=$IMG_NAME bs=512 seek=$BLMON_OFFSET
+	dd conv=notrunc if=$KMS_TARGET_DIR/loader-sd.img of=$IMG_NAME bs=512 seek=$LOADER_OFFSET
+	dd conv=notrunc if=$KMS_TARGET_DIR/bl_mon.img-signed of=$IMG_NAME bs=512 seek=$BLMON_OFFSET
 
 	if [ "$SECURE_BOOT" == "enable" ]; then
-		dd conv=notrunc if=$TARGET_DIR/secureos.img of=$IMG_NAME bs=512 seek=$SECOS_OFFSET
+		dd conv=notrunc if=$KMS_TARGET_DIR/secureos.img-signed of=$IMG_NAME bs=512 seek=$SECOS_OFFSET
 	fi
 
-	dd conv=notrunc if=$TARGET_DIR/$UBOOT_IMAGE of=$IMG_NAME bs=512 seek=$UBOOT_OFFSET
+	dd conv=notrunc if=$KMS_TARGET_DIR/${UBOOT_IMAGE}-signed of=$IMG_NAME bs=512 seek=$UBOOT_OFFSET
 	dd conv=notrunc if=$TARGET_DIR/$PARAMS_NAME of=$IMG_NAME bs=512 seek=$ENV_OFFSET
 }
 
@@ -138,16 +116,22 @@ fi
 
 SD_BOOT_SZ=`expr $ENV_OFFSET + 32`
 
-test -e $TARGET_DIR/$UBOOT_IMAGE || die
+test -e $KMS_PREBUILT_DIR/${UBOOT_IMAGE}-signed || die
 
 case "$CHIP_NAME" in
 	s5p6818)
-		test -e $PREBUILT_DIR/bl1-sdboot.img || die
+		test -e $KMS_PREBUILT_DIR/bl1-sdboot.img || die
 		test -e $PREBUILT_DIR/fip-loader-sd.img || die
-		test -e $PREBUILT_DIR/fip-secure.img || die
+		test -e $KMS_PREBUILT_DIR/fip-secure.img-signed || die
+		test -e $KMS_PREBUILT_DIR/${UBOOT_IMAGE}-signed || die
 		;;
 	s5p4418)
 		test -e $PREBUILT_DIR/bl1-sdboot.img || die
+		test -e $KMS_PREBUILT_DIR/loader-sd.img || die
+		test -e $KMS_PREBUILT_DIR/bl_mon.img-signed || die
+		test -e $KMS_PREBUILT_DIR/secureos.img-signed || die
+		test -e $KMS_PREBUILT_DIR/${UBOOT_IMAGE}-signed || die
+
 		;;
 	*)
 		test -e $PREBUILT_DIR/bl1.bin || die

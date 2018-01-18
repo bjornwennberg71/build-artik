@@ -10,11 +10,10 @@ DEST_DIR=
 PORT=
 SKIP_BUILD=false
 PREBUILT_DIR=
-PREBUILT_MODULE_DIR=
 IMG_DIR=
 UBUNTU_NAME=
 PREBUILT_REPO_DIR=
-TARGET_BOARD=
+USE_ARTIK_REPO=false
 
 print_usage()
 {
@@ -26,12 +25,11 @@ print_usage()
 	echo "-D|--dest-dir	Build output directory"
 	echo "-s|--server-port	Server port"
 	echo "--skip-build	Skip package build"
-	echo "--prebuilt-dir	Specify a directory which contains prebuilt debs"
-	echo "--prebuilt-module-dir	Specify a directory which contains prebuilt debs for specific model"
+	echo "--prebuilt-dir	Skip package build"
 	echo "--use-prebuilt-repo	Use prebuilt repository"
 	echo "--img-dir		Image generation directory"
 	echo "-n|--ubuntu-name	Ubuntu image name"
-	echo "-b [TARGET_BOARD]	Target board ex) -b artik710|artik530|artik5|artik10"
+	echo "--use-artik-repo  Use repo.artik.cloud repository"
 	exit 0
 }
 
@@ -67,9 +65,6 @@ parse_options()
 			--prebuilt-dir)
 				PREBUILT_DIR=`readlink -e "$2"`
 				shift ;;
-			--prebuilt-module-dir)
-				PREBUILT_MODULE_DIR=`readlink -e "$2"`
-				shift ;;
 			--use-prebuilt-repo)
 				PREBUILT_REPO_DIR=`readlink -e "$2"`
 				shift ;;
@@ -79,8 +74,8 @@ parse_options()
 			-n|--ubuntu-name)
 				UBUNTU_NAME="$2"
 				shift ;;
-			-b)
-				TARGET_BOARD="$2"
+			--use-artik-repo)
+				USE_ARTIK_REPO=true
 				shift ;;
 			*)
 				shift ;;
@@ -191,30 +186,6 @@ find_unused_port()
 	done
 }
 
-restrictive_pkg_check()
-{
-	if [ -d "$SECURE_PREBUILT_DIR/debs" ]; then
-		cp -f $SECURE_PREBUILT_DIR/debs/*.deb $DEST_DIR/debs
-	fi
-	if [ "${TARGET_BOARD}" == "artik530s" ] || [ "${TARGET_BOARD}" == "artik533s" ] || [ "${TARGET_BOARD}" == "artik710s" ]; then
-		RESTRICTIVE_PKG_LIST=`cat config/${TARGET_BOARD}_secure.list`
-		for l in $RESTRICTIVE_PKG_LIST
-		do
-			if [ "${l##*.}" == "deb" ] && [ ! -f $l ]; then
-				echo -e "\e[1;31mERROR: cannot find ${l}\e[0m"
-				echo -e "\e[1;31mBuild process has been terminated since the mandatory security binaries do not exist in your source code.\e[0m"
-				echo -e "\e[1;31mPlease download those files from artik.io with SLA agreement to continue to build.\e[0m"
-				echo -e "\e[1;31mOnce you download those files, please locate them to the following path.\e[0m"
-				echo -e ""
-				echo -e "\e[1;31mdeb files\e[0m"
-				echo -e "\e[1;31mcopy to ../ubuntu-build-service/prebuilt/${ARCH}/${TARGET_BOARD}/\e[0m"
-
-				exit 1
-			fi
-		done
-	fi
-}
-
 trap abnormal_exit INT ERR
 
 package_check sbuild sponge python3
@@ -230,8 +201,6 @@ fi
 if [ "$PREBUILT_REPO_DIR" != "" ]; then
 	cp -rf $PREBUILT_REPO_DIR/* $DEST_DIR/debs
 fi
-
-restrictive_pkg_check
 
 start_local_server $DEST_DIR/debs $PORT
 
@@ -254,20 +223,68 @@ if [ "$PREBUILT_DIR" != "" ]; then
 	gen_ubuntu_meta $DEST_DIR/debs artik-local repo
 fi
 
-if [ "$PREBUILT_MODULE_DIR" != "" ]; then
-	echo "Copy prebuilt packages"
-	cp -f $PREBUILT_MODULE_DIR/*.deb $DEST_DIR/debs
-	gen_ubuntu_meta $DEST_DIR/debs artik-local repo
-fi
-
 if [ "$IMG_DIR" != "" ]; then
 	echo "An ubuntu image generation starting..."
 	pushd $IMG_DIR
 	make clean
-	PORT=$PORT ./configure
+	USE_ARTIK_REPO=$USE_ARTIK_REPO PORT=$PORT ./configure
 	make IMAGEPREFIX=$UBUNTU_NAME
 	mv $UBUNTU_NAME* $DEST_DIR
-	echo "A new ubuntu image has been created"
 fi
 
 stop_local_server
+
+cat > $DEST_DIR/install_sysroot.sh << __EOF__
+#!/bin/sh
+
+uudecode \$0
+read -r -p "Install Path: " INSTALL_PATH
+export INSTALL_PATH=\$(readlink -f "\$INSTALL_PATH")
+mkdir -p \$INSTALL_PATH/BUILDROOT
+sudo tar zxf $UBUNTU_NAME.tar.gz -C \$INSTALL_PATH/BUILDROOT
+sudo rm -f $UBUNTU_NAME.tar.gz
+__EOF__
+
+if [ "$ARCH" == "arm" -o "$ARCH" == "armhf" ]; then
+cat >> $DEST_DIR/install_sysroot.sh << __EOF__
+cat > \$INSTALL_PATH/sysroot_env << __EOF__
+export PATH=:$PATH
+export PKG_CONFIG_SYSROOT_DIR=\$INSTALL_PATH/BUILDROOT
+export PKG_CONFIG_PATH=\$INSTALL_PATH/BUILDROOT/usr/lib/pkgconfig:\$INSTALL_PATH/BUILDROOT/usr/share/pkgconfig:\$INSTALL_PATH/BUILDROOT/usr/lib/arm-linux-gnueabihf/pkgconfig
+export CC="arm-linux-gnueabihf-gcc --sysroot=\$INSTALL_PATH/BUILDROOT"
+export LD="arm-linux-gnueabihf-ld --sysroot=\$INSTALL_PATH/BUILDROOT"
+export ARCH=arm
+export CROSS_COMPILE=arm-linux-gnueabihf-
+IN__EOF__
+
+echo "Sysroot in extracted on \$INSTALL_PATH/sysroot_env\""
+echo "Please run \"source \$INSTALL_PATH/sysroot_env\" before compile."
+
+exit
+__EOF__
+elif [ "$ARCH" == "aarch64" -o "$ARCH" == "arm64" ]; then
+cat >> $DEST_DIR/install_sysroot.sh << __EOF__
+cat > \$INSTALL_PATH/sysroot_env << __EOF__
+export PATH=:$PATH
+export PKG_CONFIG_SYSROOT_DIR=\$INSTALL_PATH/BUILDROOT
+export PKG_CONFIG_PATH=\$INSTALL_PATH/BUILDROOT/usr/lib/pkgconfig:\$INSTALL_PATH/BUILDROOT/usr/share/pkgconfig:\$INSTALL_PATH/BUILDROOT/usr/lib/aarch64-linux-gnu/pkgconfig
+export CC="aarch64-linux-gnu-gcc --sysroot=\$INSTALL_PATH/BUILDROOT"
+export LD="aarch64-linux-gnu-ld --sysroot=\$INSTALL_PATH/BUILDROOT"
+export ARCH=arm64
+export CROSS_COMPILE=aarch64-linux-gnu-
+IN__EOF__
+
+echo "Sysroot in extracted on \$INSTALL_PATH/sysroot_env\""
+echo "Please run \"source \$INSTALL_PATH/sysroot_env\" before compile."
+
+exit
+__EOF__
+fi
+
+sed -i -e "s/IN__EOF__/__EOF__/g" $DEST_DIR/install_sysroot.sh
+
+uuencode $DEST_DIR/$UBUNTU_NAME.tar.gz $UBUNTU_NAME.tar.gz >> $DEST_DIR/install_sysroot.sh
+chmod 755 $DEST_DIR/install_sysroot.sh
+
+
+echo "A new Ubuntu sysroot has been created"
